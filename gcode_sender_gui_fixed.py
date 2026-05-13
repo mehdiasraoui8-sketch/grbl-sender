@@ -150,7 +150,6 @@ class GrblSenderApp:
 
         try:
             self._log(f"Attempting to connect to {port} at {baud} baud...")
-            # Add rtscts=False and dsrdtr=False to avoid handshake issues
             self.serial = serial.Serial(
                 port,
                 baudrate=baud,
@@ -162,7 +161,6 @@ class GrblSenderApp:
                 dsrdtr=False
             )
             
-            # Reset Arduino on connection (DTR pulse)
             time.sleep(0.2)
             self._log("Connected successfully! Initializing...")
             
@@ -171,7 +169,6 @@ class GrblSenderApp:
             messagebox.showerror("Error", f"Failed to open port: {exc}")
             return
 
-        # Wait a moment for Arduino to initialize after reset
         time.sleep(2)
 
         self.reader_running = True
@@ -183,7 +180,6 @@ class GrblSenderApp:
         self.send_btn.config(state="normal")
         self.status_var.set("Connected")
         
-        # Send initial status query
         time.sleep(0.5)
         self._send_realtime(b"?")
 
@@ -329,16 +325,25 @@ class GrblSenderApp:
         self._log("-- Stream stopped --")
 
     def _sanitize_gcode_line(self, line):
+        # Remove comments after semicolon
+        if ';' in line:
+            line = line[:line.index(';')]
+        
         line = line.strip()
         if not line:
             return ""
-        if line.startswith(";"):
-            return ""
+        
+        # Remove parentheses comments
         if line.startswith("(") and line.endswith(")"):
             return ""
+        
         return line
 
     def _jog(self, axis, direction):
+        """
+        Jog using G0 (rapid) or G1 (linear) commands instead of $J.
+        GRBL 0.9i does not support $J. Use standard G-code instead.
+        """
         if not self.serial:
             self._log("ERROR: Not connected to serial port")
             messagebox.showerror("Error", "Connect to a serial port first.")
@@ -365,8 +370,12 @@ class GrblSenderApp:
             return
         
         distance = step * direction
-        # Format with proper precision - GRBL expects specific decimal places
-        cmd = f"$J=G91 G21 {axis}{distance:.2f} F{feed:.0f}"
+        
+        # Use G0 (rapid move) for jogging - GRBL 0.9i compatible
+        # Format: G0 X<value> Y<value> Z<value> F<feed>
+        # We send the command with only the axis being moved
+        cmd = f"G0 {axis}{distance:.2f} F{feed:.0f}"
+        
         self._log(f"Sending jog command: {cmd}")
         self._send_line(cmd)
 
