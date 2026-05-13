@@ -366,7 +366,7 @@ class GrblSenderApp:
         
         distance = step * direction
         # Format with proper precision - GRBL expects specific decimal places
-        cmd = f"$J=G91 G21 {axis}{distance:.2f} F{feed:.0f}"
+        cmd = f"$J=G91 G21 {axis} {distance:.2f} F {feed:.0f}"
         self._log(f"Sending jog command: {cmd}")
         self._send_line(cmd)
 
