@@ -340,15 +340,34 @@ class GrblSenderApp:
 
     def _jog(self, axis, direction):
         if not self.serial:
+            self._log("ERROR: Not connected to serial port")
+            messagebox.showerror("Error", "Connect to a serial port first.")
             return
+        
         try:
-            step = float(self.step_var.get())
-            feed = float(self.feed_var.get())
-        except ValueError:
-            messagebox.showerror("Error", "Invalid step or feed value.")
+            step_str = self.step_var.get().strip()
+            feed_str = self.feed_var.get().strip()
+            
+            # Remove any commas and spaces
+            step_str = step_str.replace(',', '.').replace(' ', '')
+            feed_str = feed_str.replace(',', '.').replace(' ', '')
+            
+            step = float(step_str)
+            feed = float(feed_str)
+            
+            if step <= 0 or feed <= 0:
+                raise ValueError("Step and Feed must be positive numbers")
+                
+        except ValueError as e:
+            error_msg = f"Invalid step or feed value: {e}\nStep (mm): {self.step_var.get()}\nFeed (mm/min): {self.feed_var.get()}"
+            self._log(f"ERROR: {error_msg}")
+            messagebox.showerror("Error", error_msg)
             return
+        
         distance = step * direction
-        cmd = f"$J=G91 G21 {axis}{distance:.3f} F{feed:.1f}"
+        # Format with proper precision - GRBL expects specific decimal places
+        cmd = f"$J=G91 G21 {axis}{distance:.2f} F{feed:.0f}"
+        self._log(f"Sending jog command: {cmd}")
         self._send_line(cmd)
 
     def _log(self, text):
